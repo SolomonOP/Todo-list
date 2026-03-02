@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TaskMaster Pro - Gamified Team Todo</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- Login/Signup Modal -->
+    <div id="authModal" class="modal active">
+        <div class="modal-content">
+            <div class="auth-tabs">
+                <button class="tab-btn active" onclick="switchTab('login')">Login</button>
+                <button class="tab-btn" onclick="switchTab('signup')">Sign Up</button>
+            </div>
+            
+            <!-- Login Form -->
+            <form id="loginForm" class="auth-form active">
+                <h2>Welcome Back!</h2>
+                <div class="input-group">
+                    <i class="fas fa-envelope"></i>
+                    <input type="email" id="loginEmail" placeholder="Email" required>
+                </div>
+                <div class="input-group">
+                    <i class="fas fa-lock"></i>
+                    <input type="password" id="loginPassword" placeholder="Password" required>
+                </div>
+                <button type="submit" class="auth-btn">Login</button>
+            </form>
+
+            <!-- Signup Form -->
+            <form id="signupForm" class="auth-form">
+                <h2>Join the Adventure!</h2>
+                <div class="input-group">
+                    <i class="fas fa-user"></i>
+                    <input type="text" id="signupName" placeholder="Username" required>
+                </div>
+                <div class="input-group">
+                    <i class="fas fa-envelope"></i>
+                    <input type="email" id="signupEmail" placeholder="Email" required>
+                </div>
+                <div class="input-group">
+                    <i class="fas fa-lock"></i>
+                    <input type="password" id="signupPassword" placeholder="Password" required>
+                </div>
+                <button type="submit" class="auth-btn">Start Quest</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div id="app" class="app-container hidden">
+        <!-- Header with User Info -->
+        <header class="main-header">
+            <div class="logo">
+                <i class="fas fa-dragon"></i>
+                <h1>TaskMaster Pro</h1>
+            </div>
+            <div class="user-profile">
+                <div class="user-stats">
+                    <div class="stat">
+                        <i class="fas fa-trophy"></i>
+                        <span id="userPoints">0</span>
+                    </div>
+                    <div class="stat">
+                        <i class="fas fa-fire"></i>
+                        <span id="userStreak">0</span>
+                    </div>
+                </div>
+                <div class="user-menu">
+                    <span id="usernameDisplay">Player</span>
+                    <button onclick="logout()" class="logout-btn">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="mode-selector">
+                    <button class="mode-btn active" onclick="switchMode('personal')">
+                        <i class="fas fa-user"></i>
+                        <span>Personal Quest</span>
+                    </button>
+                    <button class="mode-btn" onclick="switchMode('team')">
+                        <i class="fas fa-users"></i>
+                        <span>Team Adventure</span>
+                    </button>
+                </div>
+
+                <!-- Teams List (Visible in Team Mode) -->
+                <div id="teamsSection" class="teams-section hidden">
+                    <h3>Your Teams</h3>
+                    <div class="teams-list" id="teamsList">
+                        <!-- Teams will be populated here -->
+                    </div>
+                    <button class="create-team-btn" onclick="showCreateTeamModal()">
+                        <i class="fas fa-plus"></i> Create Team
+                    </button>
+                </div>
+
+                <!-- Task Filters -->
+                <div class="filters-section">
+                    <h3>Quest Filters</h3>
+                    <div class="filter-options">
+                        <label class="filter-option">
+                            <input type="radio" name="taskFilter" value="all" checked onchange="filterTasks()">
+                            <span>All Quests</span>
+                        </label>
+                        <label class="filter-option">
+                            <input type="radio" name="taskFilter" value="daily" onchange="filterTasks()">
+                            <span>Daily Quests</span>
+                        </label>
+                        <label class="filter-option">
+                            <input type="radio" name="taskFilter" value="weekly" onchange="filterTasks()">
+                            <span>Weekly Quests</span>
+                        </label>
+                        <label class="filter-option">
+                            <input type="radio" name="taskFilter" value="completed" onchange="filterTasks()">
+                            <span>Completed</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Leaderboard (Team Mode) -->
+                <div id="leaderboardSection" class="leaderboard-section hidden">
+                    <h3>Team Champions</h3>
+                    <div id="leaderboard" class="leaderboard">
+                        <!-- Leaderboard will be populated here -->
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Main Task Area -->
+            <section class="task-area">
+                <!-- Task Creation -->
+                <div class="task-creation">
+                    <h2 id="currentModeTitle">Personal Quests</h2>
+                    <div class="add-task-form">
+                        <input type="text" id="taskInput" placeholder="Enter your quest...">
+                        <select id="taskType">
+                            <option value="simple">Simple Quest</option>
+                            <option value="daily">Daily Quest</option>
+                            <option value="weekly">Weekly Quest</option>
+                        </select>
+                        <select id="taskDifficulty">
+                            <option value="easy">Easy ⭐</option>
+                            <option value="medium">Medium ⭐⭐</option>
+                            <option value="hard">Hard ⭐⭐⭐</option>
+                        </select>
+                        <input type="date" id="taskDueDate">
+                        <button onclick="addTask()" class="add-btn">
+                            <i class="fas fa-plus"></i> Start Quest
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tasks List -->
+                <div class="tasks-container">
+                    <div class="tasks-header">
+                        <h3>Active Quests</h3>
+                        <div class="tasks-stats">
+                            <span id="totalTasks">0</span> Active
+                        </div>
+                    </div>
+                    <div id="tasksList" class="tasks-list">
+                        <!-- Tasks will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Completed Tasks -->
+                <div class="completed-tasks">
+                    <h3>Completed Quests</h3>
+                    <div id="completedTasksList" class="tasks-list">
+                        <!-- Completed tasks will be populated here -->
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Create Team Modal -->
+    <div id="createTeamModal" class="modal">
+        <div class="modal-content">
+            <h2>Create New Team</h2>
+            <input type="text" id="teamName" placeholder="Team Name">
+            <textarea id="teamDescription" placeholder="Team Description"></textarea>
+            <div class="modal-buttons">
+                <button onclick="createTeam()" class="btn-primary">Create Team</button>
+                <button onclick="hideCreateTeamModal()" class="btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="notificationToast" class="toast hidden">
+        <i class="fas fa-bell"></i>
+        <span id="notificationMessage"></span>
+    </div>
+
+    <script src="js/main.js"></script>
+</body>
+</html>

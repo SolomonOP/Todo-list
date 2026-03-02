@@ -1,0 +1,13 @@
+{
+  "name": "taskmaster-client",
+  "version": "1.0.0",
+  "description": "Gamified Team Todo App Frontend",
+  "main": "index.html",
+  "scripts": {
+    "start": "live-server --port=5500",
+    "build": "echo 'No build step required'"
+  },
+  "devDependencies": {
+    "live-server": "^1.2.2"
+  }
+}

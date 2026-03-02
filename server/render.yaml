@@ -1,0 +1,16 @@
+# render.yaml
+services:
+  - type: web
+    name: taskmaster-backend
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false  # Will be set manually in Render dashboard
+      - key: JWT_SECRET
+        generateValue: true  # Render will generate a random secret
+      - key: FRONTEND_URL
+        sync: false  # Will set after frontend deploys
