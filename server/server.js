@@ -11,7 +11,7 @@ const app = express();
 app.use(cors({
     origin: [
         'http://localhost:5500', 
-        'https://todolist-lyart-alpha.vercel.app/'  // ← Add your new Vercel URL here
+        //'https://todolist-lyart-alpha.vercel.app'  // ← Add your new Vercel URL here
     ],
     credentials: true
 }));
