@@ -1,5 +1,7 @@
 // API Configuration
-const API_URL = 'http://localhost:5000/api';
+// At the top of main.js
+
+const API_URL = window.API_URL || 'https://your-backend-url.onrender.com/api';  // Replace with your Render URL
 
 // State Management
 let currentUser = null;
