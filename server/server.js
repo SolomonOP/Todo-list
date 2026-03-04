@@ -7,14 +7,17 @@ require('dotenv').config();
 
 const app = express();
 
-// Middleware
+// Update the CORS middleware
 app.use(cors({
     origin: [
-        'http://localhost:5500', 
-        'https://todolist-lyart-alpha.vercel.app'  // ← Add your new Vercel URL here
+        'http://localhost:5500',
+        'http://localhost:3000',
+        'https://todolist-lyart-alpha.vercel.app', // Your actual Vercel URL
+        'https://todolist-git-main-solomonraja332-2343s-projects.vercel.app/' // Preview deployments
     ],
     credentials: true
 }));
+
 app.use(express.json());
 
 // MongoDB Connection - Using environment variable
@@ -29,17 +32,17 @@ console.log('🔌 Connecting to MongoDB...');
 
 mongoose.connect(MONGODB_URI, {
     useNewUrlParser: true,
-    useUnifiedTopology: true
+    useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 45000,
 }).then(() => {
     console.log('✅ Connected to MongoDB Atlas successfully!');
-    console.log('📊 Database:', mongoose.connection.name);
 }).catch(err => {
     console.error('❌ MongoDB connection error:', err.message);
-    console.error('Please check:');
-    console.error('1. Your password is correct');
-    console.error('2. Your IP is whitelisted in MongoDB Atlas');
-    console.error('3. The database user has proper permissions');
-    process.exit(1);
+    // Don't exit in production, let Render restart
+    if (process.env.NODE_ENV !== 'production') {
+        process.exit(1);
+    }
 });
 
 // Models (keeping your existing schema definitions)

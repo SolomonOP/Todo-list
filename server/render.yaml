@@ -1,4 +1,3 @@
-# render.yaml
 services:
   - type: web
     name: taskmaster-backend
@@ -9,8 +8,17 @@ services:
       - key: NODE_ENV
         value: production
       - key: MONGODB_URI
-        sync: false  # Will be set manually in Render dashboard
+        fromDatabase:
+          name: taskmaster-db
+          property: connectionString
       - key: JWT_SECRET
-        generateValue: true  # Render will generate a random secret
+        generateValue: true
       - key: FRONTEND_URL
-        sync: false  # Will set after frontend deploys
+        value: https://your-frontend.vercel.app
+      - key: PORT
+        value: 10000
+
+databases:
+  - name: taskmaster-db
+    databaseName: taskmaster
+    user: taskmaster_user

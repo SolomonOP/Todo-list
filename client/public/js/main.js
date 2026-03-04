@@ -1,6 +1,6 @@
-// API Configuration
-//const API_URL = 'http://localhost:5000/api'; // Use this for local testing
-const API_URL = 'https://todo-list-ta4r.onrender.com/api'; // Use this for production
+const API_URL = window.location.hostname === 'localhost' 
+  ? 'http://localhost:5000/api' 
+  : 'https://todo-list-ta4r.onrender.com/api';
 
 // State Management
 let currentUser = null;
