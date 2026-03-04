@@ -148,7 +148,7 @@ function switchTab(tab) {
     }
 }
 
-// Show main app
+// Show main app - UPDATED
 function showApp() {
     authModal.classList.add('hidden');
     app.classList.remove('hidden');
@@ -157,6 +157,12 @@ function showApp() {
         document.getElementById('usernameDisplay').textContent = currentUser.name || 'Player';
         document.getElementById('userPoints').textContent = currentUser.points || 0;
         document.getElementById('userStreak').textContent = currentUser.streak || 0;
+        
+        // Ensure tasks render after app is shown
+        setTimeout(() => {
+            console.log('App shown, rendering tasks...');
+            renderTasks();
+        }, 50);
     }
 }
 
@@ -166,7 +172,7 @@ function showAuthModal() {
     app.classList.add('hidden');
 }
 
-// Load user data
+// Load user data - UPDATED
 async function loadUserData() {
     await Promise.all([
         loadTasks(),
@@ -174,44 +180,30 @@ async function loadUserData() {
         updateUserStats()
     ]);
     updateUI();
+    
+    // Extra render to be safe
+    console.log('User data loaded, ensuring tasks are rendered...');
+    renderTasks();
 }
 
-// Load tasks from backend
+// Load tasks from backend - UPDATED
 async function loadTasks() {
     try {
-        console.log('Fetching tasks from:', `${API_URL}/tasks`);
-        console.log('Current user:', currentUser);
-        console.log('Current mode:', currentMode);
-        console.log('Current team:', currentTeam);
-        
+        console.log('Fetching tasks...');
         const response = await fetch(`${API_URL}/tasks`, {
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
         });
         
-        console.log('Tasks response status:', response.status);
-        
         if (response.ok) {
             tasks = await response.json();
             console.log('Tasks loaded:', tasks.length);
             
-            // Log each task for debugging
-            tasks.forEach((task, index) => {
-                console.log(`Task ${index}:`, {
-                    id: task._id,
-                    title: task.title,
-                    completed: task.completed,
-                    team: task.team,
-                    createdBy: task.createdBy,
-                    assignedTo: task.assignedTo
-                });
-            });
-            
+            // Render tasks immediately after loading
             renderTasks();
         } else {
-            const error = await response.json();
-            console.error('Failed to load tasks:', error);
+            console.error('Failed to load tasks:', response.status);
         }
     } catch (error) {
         console.error('Failed to load tasks:', error);
