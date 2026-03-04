@@ -774,7 +774,7 @@ async function createTeam() {
     }
 }
 
-// Update user stats
+// Update user stats - FIXED VERSION
 async function updateUserStats() {
     if (!currentUser) {
         console.log('No user logged in');
@@ -789,14 +789,22 @@ async function updateUserStats() {
     }
     
     try {
+        console.log('Fetching stats for user:', userId);
         const response = await fetch(`${API_URL}/users/${userId}/stats`, {
+            method: 'GET', // Explicitly set method
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json'
             }
         });
         
+        console.log('Stats response status:', response.status);
+        
         if (response.ok) {
             const stats = await response.json();
+            console.log('Stats received:', stats);
+            
+            // Update UI with stats
             document.getElementById('userPoints').textContent = stats.points || 0;
             document.getElementById('userStreak').textContent = stats.streak || 0;
             
@@ -805,9 +813,22 @@ async function updateUserStats() {
             currentUser.streak = stats.streak;
         } else {
             console.error('Failed to fetch stats:', response.status);
+            
+            // Fallback: Use tasks to calculate points
+            console.log('Using fallback stats calculation from tasks');
+            const totalPoints = tasks.reduce((sum, task) => {
+                return sum + (task.completed ? getPointsForTask(task) : 0);
+            }, 0);
+            
+            document.getElementById('userPoints').textContent = totalPoints || currentUser.points || 0;
+            document.getElementById('userStreak').textContent = currentUser.streak || 0;
         }
     } catch (error) {
         console.error('Failed to update stats:', error);
+        
+        // Final fallback
+        document.getElementById('userPoints').textContent = currentUser.points || 0;
+        document.getElementById('userStreak').textContent = currentUser.streak || 0;
     }
 }
 

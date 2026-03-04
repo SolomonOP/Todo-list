@@ -7,20 +7,44 @@ require('dotenv').config();
 
 const app = express();
 
-// Update the CORS middleware
-app.use(cors({
-    origin: [
-        'http://localhost:5500',
-        'http://localhost:3000',
-        'https://todolist-lyart-alpha.vercel.app', // Your actual Vercel URL
-        'https://todolist-git-main-solomonraja332-2343s-projects.vercel.app/' // Preview deployments
-    ],
-    credentials: true
-}));
+// Comprehensive CORS configuration
+const corsOptions = {
+    origin: function (origin, callback) {
+        // Allow all localhost origins with any port
+        const allowedOrigins = [
+            'http://localhost:5500',
+            'http://localhost:3000',
+            'http://127.0.0.1:5500',
+            'http://127.0.0.1:3000',
+            'https://todolist-lyart-alpha.vercel.app',
+            'https://todolist-git-main-solomonraja332-2343s-projects.vercel.app'
+        ];
+        
+        // Allow requests with no origin (like mobile apps, curl)
+        if (!origin) return callback(null, true);
+        
+        if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+            callback(null, true);
+        } else {
+            console.log('CORS blocked origin:', origin);
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true,
+    optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
+
+// Add PNA (Private Network Access) headers
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Private-Network', 'true');
+    next();
+});
 
 app.use(express.json());
 
-// MongoDB Connection - Using environment variable
+// MongoDB Connection
 const MONGODB_URI = process.env.MONGODB_URI;
 
 if (!MONGODB_URI) {
@@ -39,13 +63,12 @@ mongoose.connect(MONGODB_URI, {
     console.log('✅ Connected to MongoDB Atlas successfully!');
 }).catch(err => {
     console.error('❌ MongoDB connection error:', err.message);
-    // Don't exit in production, let Render restart
     if (process.env.NODE_ENV !== 'production') {
         process.exit(1);
     }
 });
 
-// Models (keeping your existing schema definitions)
+// Models
 const UserSchema = new mongoose.Schema({
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
@@ -101,7 +124,7 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
-// Health check endpoint (useful for testing)
+// Health check endpoint
 app.get('/api/health', (req, res) => {
     res.json({ 
         status: 'OK', 
@@ -116,16 +139,13 @@ app.post('/api/auth/register', async (req, res) => {
     try {
         const { name, email, password } = req.body;
         
-        // Check if user exists
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ error: 'Email already registered' });
         }
         
-        // Hash password
         const hashedPassword = await bcrypt.hash(password, 10);
         
-        // Create user
         const user = new User({
             name,
             email,
@@ -134,7 +154,6 @@ app.post('/api/auth/register', async (req, res) => {
         
         await user.save();
         
-        // Generate token
         const token = jwt.sign(
             { id: user._id, email: user.email },
             process.env.JWT_SECRET || 'your-secret-key-change-this',
@@ -161,23 +180,19 @@ app.post('/api/auth/login', async (req, res) => {
     try {
         const { email, password } = req.body;
         
-        // Find user
         const user = await User.findOne({ email });
         if (!user) {
             return res.status(401).json({ error: 'Invalid email or password' });
         }
         
-        // Check password
         const validPassword = await bcrypt.compare(password, user.password);
         if (!validPassword) {
             return res.status(401).json({ error: 'Invalid email or password' });
         }
         
-        // Update last active
         user.lastActive = new Date();
         await user.save();
         
-        // Generate token
         const token = jwt.sign(
             { id: user._id, email: user.email },
             process.env.JWT_SECRET || 'your-secret-key-change-this',
@@ -236,7 +251,6 @@ app.post('/api/tasks', authenticateToken, async (req, res) => {
     try {
         const { title, type, difficulty, dueDate, mode, teamId } = req.body;
         
-        // Calculate points
         const points = {
             easy: 10,
             medium: 20,
@@ -277,23 +291,19 @@ app.put('/api/tasks/:id', authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'Task not found' });
         }
         
-        // Check permission
         if (task.createdBy.toString() !== req.user.id && task.assignedTo?.toString() !== req.user.id) {
             return res.status(403).json({ error: 'Permission denied' });
         }
         
-        // Update fields
         if (title !== undefined) task.title = title;
         if (completed !== undefined) {
             task.completed = completed;
             task.completedAt = completed ? new Date() : null;
             
-            // Award points if completing task
             if (completed && !task.completed) {
                 const user = await User.findById(req.user.id);
                 user.points += task.points;
                 
-                // Update streak
                 const lastActive = new Date(user.lastActive);
                 const today = new Date();
                 const diffDays = Math.floor((today - lastActive) / (1000 * 60 * 60 * 24));
@@ -331,7 +341,6 @@ app.delete('/api/tasks/:id', authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'Task not found' });
         }
         
-        // Check permission
         if (task.createdBy.toString() !== req.user.id) {
             return res.status(403).json({ error: 'Permission denied' });
         }
@@ -389,17 +398,14 @@ app.get('/api/teams/:id/leaderboard', authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'Team not found' });
         }
         
-        // Check if user is member
         if (!team.members.includes(req.user.id)) {
             return res.status(403).json({ error: 'Not a team member' });
         }
         
-        // Get member stats
         const members = await User.find({
             _id: { $in: team.members }
         }).select('name points');
         
-        // Sort by points
         members.sort((a, b) => b.points - a.points);
         
         res.json(members);
@@ -409,19 +415,50 @@ app.get('/api/teams/:id/leaderboard', authenticateToken, async (req, res) => {
     }
 });
 
-// User Stats Route
+// User Stats Route - ENHANCED VERSION
 app.get('/api/users/:id/stats', authenticateToken, async (req, res) => {
     try {
+        console.log('Stats requested for user:', req.params.id);
+        
+        // Verify the user is requesting their own stats
+        if (req.params.id !== req.user.id) {
+            return res.status(403).json({ error: 'Can only access your own stats' });
+        }
+        
         const user = await User.findById(req.params.id).select('points streak lastActive');
         
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
         }
         
+        // Get additional stats from tasks for a more complete response
+        const tasks = await Task.find({
+            $or: [
+                { createdBy: req.user.id },
+                { assignedTo: req.user.id }
+            ]
+        });
+        
+        const completedTasks = tasks.filter(t => t.completed).length;
+        const totalTasks = tasks.length;
+        const completionRate = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+        
+        // Get today's completed tasks
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const todayTasks = tasks.filter(t => 
+            t.completed && t.completedAt && new Date(t.completedAt) >= today
+        ).length;
+        
         res.json({
             points: user.points,
             streak: user.streak,
-            lastActive: user.lastActive
+            lastActive: user.lastActive,
+            completedTasks,
+            totalTasks,
+            completionRate: Math.round(completionRate * 100) / 100,
+            todayTasks
         });
     } catch (error) {
         console.error('Get stats error:', error);
@@ -437,6 +474,7 @@ app.use((err, req, res, next) => {
 
 // 404 handler
 app.use('*', (req, res) => {
+    console.log('404 - Route not found:', req.originalUrl);
     res.status(404).json({ error: 'Route not found' });
 });
 
