@@ -1,7 +1,13 @@
-// API Configuration
-const API_URL = window.location.hostname === 'localhost' 
-  ? 'http://localhost:5000/api' 
-  : 'https://todo-list-ta4r.onrender.com/api';
+// API Configuration - FIXED VERSION
+const API_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? 'http://localhost:5000/api'  // Local development
+  : 'https://todo-list-ta4r.onrender.com/api'; // Production
+
+console.log('✅ Environment detected:', {
+    hostname: window.location.hostname,
+    isLocal: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1',
+    apiUrl: API_URL
+});
 
 // State Management
 let currentUser = null;

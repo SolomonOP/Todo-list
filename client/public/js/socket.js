@@ -9,10 +9,12 @@ class SocketManager {
     }
 
     connect(token) {
-        // Use different URLs for dev and production
-        const SOCKET_URL = window.location.hostname === 'localhost'
-            ? 'http://localhost:5000'  // Local WebSocket
-            : 'https://todo-list-ta4r.onrender.com'; // Production WebSocket
+        // Use the same logic as API_URL
+        const SOCKET_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+            ? 'http://localhost:5000'  // Local development
+            : 'https://todo-list-ta4r.onrender.com'; // Production
+        
+        console.log('🔌 Connecting to socket:', SOCKET_URL);
         
         this.socket = io(SOCKET_URL, {
             auth: { token },
