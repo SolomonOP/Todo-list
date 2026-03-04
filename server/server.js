@@ -7,43 +7,47 @@ require('dotenv').config();
 
 const app = express();
 
-// Comprehensive CORS configuration
-const corsOptions = {
-    origin: function (origin, callback) {
-        // Allow all localhost origins with any port
-        const allowedOrigins = [
-            'http://localhost:5500',
-            'http://localhost:3000',
-            'http://127.0.0.1:5500',
-            'http://127.0.0.1:3000',
-            'https://todolist-lyart-alpha.vercel.app',
-            'https://todolist-git-main-solomonraja332-2343s-projects.vercel.app',
-            'https://todo-list-ta4r.onrender.com'
-        ];
-        
-        // Allow requests with no origin (like mobile apps, curl)
-        if (!origin) return callback(null, true);
-        
-        if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
-            callback(null, true);
-        } else {
-            console.log('CORS blocked origin:', origin);
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
-    credentials: true,
-    optionsSuccessStatus: 200
-};
+// ========== MIDDLEWARE ORDER IS CRITICAL ==========
+// 1. CORS and PNA headers must come FIRST
+// 2. Then body parsing
+// 3. Then routes
 
-app.use(cors(corsOptions));
-
-// Add PNA (Private Network Access) headers
+// Global middleware for PNA and CORS headers (applies to ALL requests)
 app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Private-Network', 'true');
+    // Set CORS headers for all responses
+    const allowedOrigins = [
+        'http://localhost:5500',
+        'http://localhost:3000',
+        'http://127.0.0.1:5500',
+        'http://127.0.0.1:3000',
+        'https://todolist-lyart-alpha.vercel.app',
+        'https://todolist-git-main-solomonraja332-2343s-projects.vercel.app',
+        'https://todo-list-ta4r.onrender.com'
+    ];
+    
+    const origin = req.headers.origin;
+    if (allowedOrigins.includes(origin) || !origin) {
+        res.setHeader('Access-Control-Allow-Origin', origin || '*');
+    }
+    
+    // Critical PNA header
+    res.setHeader('Access-Control-Allow-Private-Network', 'true');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
+    
+    // Handle preflight requests immediately
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(204);
+    }
+    
     next();
 });
 
+// Then body parsing middleware
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // MongoDB Connection
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -125,18 +129,9 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
-// Add this before your other routes
-app.options('*', (req, res) => {
-    res.header('Access-Control-Allow-Private-Network', 'true');
-    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Max-Age', '86400');
-    res.sendStatus(204);
-});
+// ========== ROUTES ==========
 
-// Health check endpoint
+// Health check endpoint (public)
 app.get('/api/health', (req, res) => {
     res.json({ 
         status: 'OK', 
@@ -427,12 +422,11 @@ app.get('/api/teams/:id/leaderboard', authenticateToken, async (req, res) => {
     }
 });
 
-// User Stats Route - ENHANCED VERSION
+// User Stats Route
 app.get('/api/users/:id/stats', authenticateToken, async (req, res) => {
     try {
         console.log('Stats requested for user:', req.params.id);
         
-        // Verify the user is requesting their own stats
         if (req.params.id !== req.user.id) {
             return res.status(403).json({ error: 'Can only access your own stats' });
         }
@@ -443,7 +437,6 @@ app.get('/api/users/:id/stats', authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
         
-        // Get additional stats from tasks for a more complete response
         const tasks = await Task.find({
             $or: [
                 { createdBy: req.user.id },
@@ -455,7 +448,6 @@ app.get('/api/users/:id/stats', authenticateToken, async (req, res) => {
         const totalTasks = tasks.length;
         const completionRate = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
         
-        // Get today's completed tasks
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         
@@ -478,16 +470,16 @@ app.get('/api/users/:id/stats', authenticateToken, async (req, res) => {
     }
 });
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-    console.error('Unhandled error:', err);
-    res.status(500).json({ error: 'Something went wrong!' });
-});
-
-// 404 handler
+// 404 handler - must be last
 app.use('*', (req, res) => {
     console.log('404 - Route not found:', req.originalUrl);
     res.status(404).json({ error: 'Route not found' });
+});
+
+// Error handling middleware - must be last
+app.use((err, req, res, next) => {
+    console.error('Unhandled error:', err);
+    res.status(500).json({ error: 'Something went wrong!' });
 });
 
 // Start server
