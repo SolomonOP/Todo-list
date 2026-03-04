@@ -1,7 +1,7 @@
 // API Configuration
 // At the top of main.js
 
-const API_URL = 'https://todo-list-ta4r.onrender.com'; // Replace with your Render URL
+const API_URL = 'https://todo-list-ta4r.onrender.com/api'; // Replace with your Render URL
 
 // State Management
 let currentUser = null;
@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
 });
 
-// Check if user is logged in
+// Update this function
 async function checkAuthStatus() {
     const token = localStorage.getItem('token');
     if (token) {
@@ -43,8 +43,8 @@ async function checkAuthStatus() {
             if (response.ok) {
                 const data = await response.json();
                 currentUser = data.user;
+                console.log('User logged in:', currentUser); // Debug log
                 showApp();
-                loadUserData();
             } else {
                 showAuthModal();
             }
@@ -56,6 +56,7 @@ async function checkAuthStatus() {
         showAuthModal();
     }
 }
+
 
 // Event Listeners
 function setupEventListeners() {
@@ -144,9 +145,15 @@ function switchTab(tab) {
 function showApp() {
     authModal.classList.add('hidden');
     app.classList.remove('hidden');
-    document.getElementById('usernameDisplay').textContent = currentUser.name;
-    document.getElementById('userPoints').textContent = currentUser.points || 0;
-    document.getElementById('userStreak').textContent = currentUser.streak || 0;
+    
+    if (currentUser) {
+        document.getElementById('usernameDisplay').textContent = currentUser.name || 'Player';
+        document.getElementById('userPoints').textContent = currentUser.points || 0;
+        document.getElementById('userStreak').textContent = currentUser.streak || 0;
+        
+        // Load user data after showing app
+        loadUserData();
+    }
 }
 
 // Show auth modal
@@ -595,8 +602,13 @@ async function createTeam() {
 
 // Update user stats
 async function updateUserStats() {
+    if (!currentUser || !currentUser.id) {
+        console.log('No user ID available');
+        return;
+    }
+    
     try {
-        const response = await fetch(`${API_URL}/users/${currentUser._id}/stats`, {
+        const response = await fetch(`${API_URL}/users/${currentUser.id}/stats`, {
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
@@ -604,8 +616,8 @@ async function updateUserStats() {
         
         if (response.ok) {
             const stats = await response.json();
-            document.getElementById('userPoints').textContent = stats.points;
-            document.getElementById('userStreak').textContent = stats.streak;
+            document.getElementById('userPoints').textContent = stats.points || 0;
+            document.getElementById('userStreak').textContent = stats.streak || 0;
         }
     } catch (error) {
         console.error('Failed to update stats:', error);
