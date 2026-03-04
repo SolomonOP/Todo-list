@@ -1,13 +1,37 @@
-// API Configuration - FIXED VERSION
-const API_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-  ? 'http://localhost:5000/api'  // Local development
-  : 'https://todo-list-ta4r.onrender.com/api'; // Production
+// Add this right after your middleware section in server.js
 
-console.log('✅ Environment detected:', {
-    hostname: window.location.hostname,
-    isLocal: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1',
-    apiUrl: API_URL
+// Specific CORS and PNA headers for Chrome
+app.use((req, res, next) => {
+    // Allow all origins in development, specific in production
+    const allowedOrigins = [
+        'http://localhost:5500',
+        'http://127.0.0.1:5500',
+        'https://todolist-lyart-alpha.vercel.app',
+        'https://todolist-git-main-solomonraja332-2343s-projects.vercel.app'
+    ];
+    
+    const origin = req.headers.origin;
+    if (allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
+        res.setHeader('Access-Control-Allow-Origin', origin || '*');
+    }
+    
+    // Critical: These headers tell Chrome it's safe
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Private-Network', 'true'); // This is key!
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    
+    // Handle preflight
+    if (req.method === 'OPTIONS') {
+        res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
+        return res.sendStatus(204);
+    }
+    
+    next();
 });
+
+// Remove the old cors() middleware or keep both
+// app.use(cors(corsOptions)); // You can keep this too
 
 // State Management
 let currentUser = null;
