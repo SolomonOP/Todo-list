@@ -1,5 +1,9 @@
 // Add this right after your middleware section in server.js
-
+const API_URL =
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1'
+        ? 'http://localhost:5000/api'
+        : 'https://todo-list-ta4r.onrender.com/api';
 // Specific CORS and PNA headers for Chrome
 app.use((req, res, next) => {
     // Allow all origins in development, specific in production
