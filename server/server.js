@@ -17,21 +17,29 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// MongoDB Connection - UPDATED with your specific connection string
-const MONGODB_URI = 'mongodb+srv://Spidy:YOUR_ACTUAL_PASSWORD_HERE@cluster0.euzsakw.mongodb.net/taskmaster_db?retryWrites=true&w=majority&appName=Cluster0';
+// MongoDB Connection - Using environment variable
+const MONGODB_URI = process.env.MONGODB_URI;
+
+if (!MONGODB_URI) {
+    console.error('❌ MONGODB_URI is not defined in .env file!');
+    process.exit(1);
+}
+
+console.log('🔌 Connecting to MongoDB...');
 
 mongoose.connect(MONGODB_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true
 }).then(() => {
     console.log('✅ Connected to MongoDB Atlas successfully!');
-    console.log('📊 Database: taskmaster_db');
+    console.log('📊 Database:', mongoose.connection.name);
 }).catch(err => {
-    console.error('❌ MongoDB connection error:', err);
+    console.error('❌ MongoDB connection error:', err.message);
     console.error('Please check:');
     console.error('1. Your password is correct');
     console.error('2. Your IP is whitelisted in MongoDB Atlas');
     console.error('3. The database user has proper permissions');
+    process.exit(1);
 });
 
 // Models (keeping your existing schema definitions)
