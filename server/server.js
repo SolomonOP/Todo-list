@@ -17,7 +17,8 @@ const corsOptions = {
             'http://127.0.0.1:5500',
             'http://127.0.0.1:3000',
             'https://todolist-lyart-alpha.vercel.app',
-            'https://todolist-git-main-solomonraja332-2343s-projects.vercel.app'
+            'https://todolist-git-main-solomonraja332-2343s-projects.vercel.app',
+            'https://todo-list-ta4r.onrender.com'
         ];
         
         // Allow requests with no origin (like mobile apps, curl)

@@ -9,7 +9,12 @@ class SocketManager {
     }
 
     connect(token) {
-        this.socket = io(API_URL, {
+        // Use different URLs for dev and production
+        const SOCKET_URL = window.location.hostname === 'localhost'
+            ? 'http://localhost:5000'  // Local WebSocket
+            : 'https://todo-list-ta4r.onrender.com'; // Production WebSocket
+        
+        this.socket = io(SOCKET_URL, {
             auth: { token },
             transports: ['websocket'],
             reconnection: true,
