@@ -2,14 +2,14 @@
 const API_URL =
     window.location.hostname === 'localhost' ||
     window.location.hostname === '127.0.0.1'
-        ? 'http://localhost:5000/api'
+        ? 'https://localhost:5000/api'
         : 'https://todo-list-ta4r.onrender.com/api';
 // Specific CORS and PNA headers for Chrome
 app.use((req, res, next) => {
     // Allow all origins in development, specific in production
     const allowedOrigins = [
-        'http://localhost:5500',
-        'http://127.0.0.1:5500',
+        'https://localhost:5500',
+        'https://127.0.0.1:5500',
         'https://todolist-lyart-alpha.vercel.app',
         'https://todolist-git-main-solomonraja332-2343s-projects.vercel.app'
     ];
