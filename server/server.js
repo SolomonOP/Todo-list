@@ -125,6 +125,17 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
+// Add this before your other routes
+app.options('*', (req, res) => {
+    res.header('Access-Control-Allow-Private-Network', 'true');
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Max-Age', '86400');
+    res.sendStatus(204);
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
     res.json({ 
