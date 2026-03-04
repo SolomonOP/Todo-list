@@ -418,19 +418,27 @@ function filterTasks() {
     renderTasks();
 }
 
-// Check if task belongs to current user
+// Replace your existing isUserTask function
 function isUserTask(task) {
     const currentUserId = getCurrentUserId();
     if (!currentUserId) return false;
     
-    // Handle different possible ID formats
+    // Handle different possible ID formats (object vs string)
     const taskCreatedBy = task.createdBy?.id || task.createdBy?._id || task.createdBy;
     const taskAssignedTo = task.assignedTo?.id || task.assignedTo?._id || task.assignedTo;
+    
+    console.log('isUserTask check:', {
+        taskTitle: task.title,
+        taskCreatedBy,
+        taskAssignedTo,
+        currentUserId,
+        match: taskCreatedBy === currentUserId || taskAssignedTo === currentUserId
+    });
     
     return taskCreatedBy === currentUserId || taskAssignedTo === currentUserId;
 }
 
-// Render tasks based on current mode and filters
+// Replace your existing renderTasks function with this
 function renderTasks() {
     console.log('=== RENDER TASKS ===');
     console.log('Current mode:', currentMode);
@@ -443,17 +451,23 @@ function renderTasks() {
     
     // Filter tasks based on current mode
     let filteredTasks = tasks.filter(task => {
+        // Get the actual IDs from possibly nested objects
+        const taskCreatedById = task.createdBy?.id || task.createdBy?._id || task.createdBy;
+        const taskAssignedToId = task.assignedTo?.id || task.assignedTo?._id || task.assignedTo;
+        const currentUserId = getCurrentUserId();
+        
         if (currentMode === 'personal') {
             // Personal mode: show tasks where user is creator or assignee AND no team
             const isPersonalTask = !task.team;
-            const isUsersTask = isUserTask(task);
+            const isUsersTask = taskCreatedById === currentUserId || taskAssignedToId === currentUserId;
             
             console.log(`Task "${task.title}":`, {
+                taskCreatedById,
+                taskAssignedToId,
+                currentUserId,
                 isPersonalTask,
                 isUsersTask,
-                taskTeam: task.team,
-                taskCreatedBy: task.createdBy,
-                taskAssignedTo: task.assignedTo
+                taskTeam: task.team
             });
             
             return isPersonalTask && isUsersTask;
@@ -464,9 +478,12 @@ function renderTasks() {
                 return false;
             }
             
-            const isTeamTask = task.team === currentTeam._id;
+            const isTeamTask = task.team === currentTeam._id || 
+                              (task.team && task.team._id === currentTeam._id);
+            
             console.log(`Task "${task.title}" team check:`, {
                 taskTeam: task.team,
+                taskTeamId: task.team?._id || task.team,
                 currentTeamId: currentTeam._id,
                 isTeamTask
             });
@@ -477,10 +494,20 @@ function renderTasks() {
     
     console.log('Filtered tasks:', filteredTasks);
     
+    // If no tasks after filtering and we're in personal mode, show ALL personal tasks as fallback
+    if (filteredTasks.length === 0 && currentMode === 'personal') {
+        console.log('No tasks matched filters, showing all personal tasks as fallback');
+        filteredTasks = tasks.filter(task => {
+            const hasNoTeam = !task.team;
+            console.log(`Fallback check - Task "${task.title}":`, { hasNoTeam });
+            return hasNoTeam;
+        });
+    }
+    
     // Apply additional filters (daily, weekly, completed)
     if (filter !== 'all') {
         filteredTasks = filteredTasks.filter(task => {
-            if (filter === 'completed') return task.completed;
+            if (filter === 'completed') return task.completed === true;
             return task.type === filter;
         });
         console.log('After type filter:', filteredTasks);
@@ -494,7 +521,11 @@ function renderTasks() {
     console.log('Completed tasks count:', completedTasks.length);
     
     // Sort active tasks by due date
-    activeTasks.sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+    activeTasks.sort((a, b) => {
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        return new Date(a.dueDate) - new Date(b.dueDate);
+    });
     
     // Get the container elements
     const tasksList = document.getElementById('tasksList');
@@ -510,10 +541,11 @@ function renderTasks() {
         tasksList.innerHTML = '<div class="no-tasks">No active quests. Start one!</div>';
         console.log('No active tasks to display');
     } else {
-        tasksList.innerHTML = activeTasks.map(task => {
+        const html = activeTasks.map(task => {
             console.log('Creating HTML for active task:', task.title);
             return createTaskHTML(task, false);
         }).join('');
+        tasksList.innerHTML = html;
     }
     
     // Render completed tasks
