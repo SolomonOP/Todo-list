@@ -1,3 +1,4 @@
+// API Configuration
 const API_URL = window.location.hostname === 'localhost' 
   ? 'http://localhost:5000/api' 
   : 'https://todo-list-ta4r.onrender.com/api';
@@ -22,6 +23,11 @@ const leaderboardSection = document.getElementById('leaderboardSection');
 const notificationToast = document.getElementById('notificationToast');
 const notificationMessage = document.getElementById('notificationMessage');
 
+// Helper function to get current user ID consistently
+function getCurrentUserId() {
+    return currentUser?.id || currentUser?._id;
+}
+
 // Initialize App
 document.addEventListener('DOMContentLoaded', () => {
     checkAuthStatus();
@@ -42,7 +48,7 @@ async function checkAuthStatus() {
             if (response.ok) {
                 const data = await response.json();
                 currentUser = data.user;
-                console.log('User logged in:', currentUser); // Debug log
+                console.log('User logged in:', currentUser);
                 showApp();
                 await loadUserData();
             } else {
@@ -59,7 +65,6 @@ async function checkAuthStatus() {
 
 // Event Listeners
 function setupEventListeners() {
-    // Login form submission
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const email = document.getElementById('loginEmail').value;
@@ -92,7 +97,6 @@ function setupEventListeners() {
         }
     });
 
-    // Signup form submission
     signupForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const name = document.getElementById('signupName').value;
@@ -175,19 +179,39 @@ async function loadUserData() {
 // Load tasks from backend
 async function loadTasks() {
     try {
-        console.log('Fetching tasks...');
+        console.log('Fetching tasks from:', `${API_URL}/tasks`);
+        console.log('Current user:', currentUser);
+        console.log('Current mode:', currentMode);
+        console.log('Current team:', currentTeam);
+        
         const response = await fetch(`${API_URL}/tasks`, {
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
         });
         
+        console.log('Tasks response status:', response.status);
+        
         if (response.ok) {
             tasks = await response.json();
-            console.log('Tasks loaded:', tasks); // Debug: see what tasks are returned
+            console.log('Tasks loaded:', tasks.length);
+            
+            // Log each task for debugging
+            tasks.forEach((task, index) => {
+                console.log(`Task ${index}:`, {
+                    id: task._id,
+                    title: task.title,
+                    completed: task.completed,
+                    team: task.team,
+                    createdBy: task.createdBy,
+                    assignedTo: task.assignedTo
+                });
+            });
+            
             renderTasks();
         } else {
-            console.error('Failed to load tasks:', response.status);
+            const error = await response.json();
+            console.error('Failed to load tasks:', error);
         }
     } catch (error) {
         console.error('Failed to load tasks:', error);
@@ -205,6 +229,7 @@ async function loadTeams() {
         
         if (response.ok) {
             teams = await response.json();
+            console.log('Teams loaded:', teams);
             renderTeams();
         }
     } catch (error) {
@@ -223,6 +248,7 @@ function switchMode(mode) {
         teamsSection.classList.add('hidden');
         leaderboardSection.classList.add('hidden');
         document.getElementById('currentModeTitle').textContent = 'Personal Quests';
+        currentTeam = null; // Reset team selection when switching to personal
     } else {
         modeBtns[1].classList.add('active');
         teamsSection.classList.remove('hidden');
@@ -240,6 +266,8 @@ async function addTask() {
     const difficulty = document.getElementById('taskDifficulty').value;
     const dueDate = document.getElementById('taskDueDate').value;
     
+    console.log('Adding task:', { title, type, difficulty, dueDate, mode: currentMode, teamId: currentTeam?._id });
+    
     if (!title) {
         showNotification('Please enter a quest!', 'warning');
         return;
@@ -255,6 +283,10 @@ async function addTask() {
     };
     
     try {
+        console.log('Sending to API:', taskData);
+        console.log('API URL:', API_URL);
+        console.log('Token:', localStorage.getItem('token') ? 'Present' : 'Missing');
+        
         const response = await fetch(`${API_URL}/tasks`, {
             method: 'POST',
             headers: {
@@ -264,15 +296,25 @@ async function addTask() {
             body: JSON.stringify(taskData)
         });
         
+        console.log('Add task response status:', response.status);
+        
         if (response.ok) {
             const newTask = await response.json();
-            tasks.push(newTask);
-            renderTasks();
-            document.getElementById('taskInput').value = '';
-            showNotification('New quest started! 🎯');
+            console.log('Task created successfully:', newTask);
             
-            // Update points and streak
+            // Refresh all tasks from server instead of just pushing
+            await loadTasks();
+            
+            // Clear input
+            document.getElementById('taskInput').value = '';
+            document.getElementById('taskDueDate').value = '';
+            
+            showNotification('New quest started! 🎯');
             updateUserStats();
+        } else {
+            const error = await response.json();
+            console.error('Server error:', error);
+            showNotification('Failed to start quest: ' + (error.error || 'Unknown error'), 'error');
         }
     } catch (error) {
         console.error('Failed to add task:', error);
@@ -283,6 +325,8 @@ async function addTask() {
 // Toggle task completion
 async function toggleTask(taskId, completed) {
     try {
+        console.log('Toggling task:', taskId, 'Completed:', completed);
+        
         const response = await fetch(`${API_URL}/tasks/${taskId}`, {
             method: 'PUT',
             headers: {
@@ -294,20 +338,22 @@ async function toggleTask(taskId, completed) {
         
         if (response.ok) {
             const updatedTask = await response.json();
-            const taskIndex = tasks.findIndex(t => t._id === taskId);
-            tasks[taskIndex] = updatedTask;
-            renderTasks();
+            console.log('Task toggled:', updatedTask);
+            
+            // Refresh all tasks
+            await loadTasks();
             
             if (!completed) {
-                // Task just completed
                 showNotification(`Quest completed! +${getPointsForTask(updatedTask)} points! 🏆`);
                 updateUserStats();
                 
-                // Send notification to team members if it's a team task
                 if (updatedTask.team) {
                     notifyTeamMembers(updatedTask);
                 }
             }
+        } else {
+            const error = await response.json();
+            console.error('Failed to toggle task:', error);
         }
     } catch (error) {
         console.error('Failed to toggle task:', error);
@@ -327,8 +373,8 @@ async function deleteTask(taskId) {
         });
         
         if (response.ok) {
-            tasks = tasks.filter(t => t._id !== taskId);
-            renderTasks();
+            console.log('Task deleted:', taskId);
+            await loadTasks(); // Refresh tasks
             showNotification('Quest abandoned', 'info');
         }
     } catch (error) {
@@ -359,10 +405,8 @@ async function updateTask(taskId, updates) {
         });
         
         if (response.ok) {
-            const updatedTask = await response.json();
-            const taskIndex = tasks.findIndex(t => t._id === taskId);
-            tasks[taskIndex] = updatedTask;
-            renderTasks();
+            console.log('Task updated:', updates);
+            await loadTasks(); // Refresh tasks
         }
     } catch (error) {
         console.error('Failed to update task:', error);
@@ -374,22 +418,60 @@ function filterTasks() {
     renderTasks();
 }
 
+// Check if task belongs to current user
+function isUserTask(task) {
+    const currentUserId = getCurrentUserId();
+    if (!currentUserId) return false;
+    
+    // Handle different possible ID formats
+    const taskCreatedBy = task.createdBy?.id || task.createdBy?._id || task.createdBy;
+    const taskAssignedTo = task.assignedTo?.id || task.assignedTo?._id || task.assignedTo;
+    
+    return taskCreatedBy === currentUserId || taskAssignedTo === currentUserId;
+}
+
 // Render tasks based on current mode and filters
 function renderTasks() {
-    console.log('Rendering tasks. Current mode:', currentMode);
+    console.log('=== RENDER TASKS ===');
+    console.log('Current mode:', currentMode);
+    console.log('Current user ID:', getCurrentUserId());
+    console.log('Current team:', currentTeam?._id);
     console.log('All tasks:', tasks);
     
     const filter = document.querySelector('input[name="taskFilter"]:checked')?.value || 'all';
+    console.log('Current filter:', filter);
     
     // Filter tasks based on current mode
     let filteredTasks = tasks.filter(task => {
-        // Check if task belongs to current mode
         if (currentMode === 'personal') {
             // Personal mode: show tasks where user is creator or assignee AND no team
-            return !task.team && (task.createdBy === currentUser?.id || task.assignedTo === currentUser?.id);
+            const isPersonalTask = !task.team;
+            const isUsersTask = isUserTask(task);
+            
+            console.log(`Task "${task.title}":`, {
+                isPersonalTask,
+                isUsersTask,
+                taskTeam: task.team,
+                taskCreatedBy: task.createdBy,
+                taskAssignedTo: task.assignedTo
+            });
+            
+            return isPersonalTask && isUsersTask;
         } else {
             // Team mode: show tasks for selected team
-            return currentTeam && task.team === currentTeam._id;
+            if (!currentTeam) {
+                console.log('No team selected');
+                return false;
+            }
+            
+            const isTeamTask = task.team === currentTeam._id;
+            console.log(`Task "${task.title}" team check:`, {
+                taskTeam: task.team,
+                currentTeamId: currentTeam._id,
+                isTeamTask
+            });
+            
+            return isTeamTask;
         }
     });
     
@@ -401,14 +483,15 @@ function renderTasks() {
             if (filter === 'completed') return task.completed;
             return task.type === filter;
         });
+        console.log('After type filter:', filteredTasks);
     }
     
     // Separate active and completed tasks
     const activeTasks = filteredTasks.filter(t => !t.completed);
     const completedTasks = filteredTasks.filter(t => t.completed);
     
-    console.log('Active tasks:', activeTasks);
-    console.log('Completed tasks:', completedTasks);
+    console.log('Active tasks count:', activeTasks.length);
+    console.log('Completed tasks count:', completedTasks.length);
     
     // Sort active tasks by due date
     activeTasks.sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
@@ -425,15 +508,22 @@ function renderTasks() {
     // Render active tasks
     if (activeTasks.length === 0) {
         tasksList.innerHTML = '<div class="no-tasks">No active quests. Start one!</div>';
+        console.log('No active tasks to display');
     } else {
-        tasksList.innerHTML = activeTasks.map(task => createTaskHTML(task, false)).join('');
+        tasksList.innerHTML = activeTasks.map(task => {
+            console.log('Creating HTML for active task:', task.title);
+            return createTaskHTML(task, false);
+        }).join('');
     }
     
     // Render completed tasks
     if (completedTasks.length === 0) {
         completedTasksList.innerHTML = '<div class="no-tasks">No completed quests yet.</div>';
     } else {
-        completedTasksList.innerHTML = completedTasks.map(task => createTaskHTML(task, true)).join('');
+        completedTasksList.innerHTML = completedTasks.map(task => {
+            console.log('Creating HTML for completed task:', task.title);
+            return createTaskHTML(task, true);
+        }).join('');
     }
     
     // Update total tasks count
@@ -441,9 +531,11 @@ function renderTasks() {
     if (totalTasksEl) {
         totalTasksEl.textContent = activeTasks.length;
     }
+    
+    console.log('=== RENDER COMPLETE ===');
 }
 
-// Update createTaskHTML to handle missing data
+// Create task HTML
 function createTaskHTML(task, isCompleted) {
     if (!task) return '';
     
@@ -505,31 +597,22 @@ function createTaskHTML(task, isCompleted) {
     `;
 }
 
-// Add this CSS to your style.css (at the end)
-const style = document.createElement('style');
-style.textContent = `
-    .no-tasks {
-        text-align: center;
-        padding: 20px;
-        color: #666;
-        font-style: italic;
-    }
-`;
-document.head.appendChild(style);
-
 // Get points for task based on difficulty and type
 function getPointsForTask(task) {
-    let points = {
+    const basePoints = {
         easy: 10,
         medium: 20,
         hard: 30
-    }[task.difficulty];
+    }[task.difficulty] || 10;
     
     // Bonus for recurring tasks
-    if (task.type === 'daily') points += 5;
-    if (task.type === 'weekly') points += 15;
+    const bonus = {
+        daily: 5,
+        weekly: 15,
+        monthly: 30
+    }[task.type] || 0;
     
-    return points;
+    return basePoints + bonus;
 }
 
 // Get difficulty stars
@@ -539,11 +622,12 @@ function getDifficultyStars(difficulty) {
         medium: '⭐⭐',
         hard: '⭐⭐⭐'
     };
-    return stars[difficulty];
+    return stars[difficulty] || '⭐';
 }
 
 // Format date
 function formatDate(dateString) {
+    if (!dateString) return 'No date';
     const options = { month: 'short', day: 'numeric' };
     return new Date(dateString).toLocaleDateString('en-US', options);
 }
@@ -562,7 +646,7 @@ function renderTeams() {
              onclick="selectTeam('${team._id}')">
             <i class="fas fa-users"></i>
             <span>${team.name}</span>
-            <span class="team-member-count">${team.members.length}</span>
+            <span class="team-member-count">${team.members?.length || 0}</span>
         </div>
     `).join('');
 }
@@ -570,6 +654,7 @@ function renderTeams() {
 // Select team
 function selectTeam(teamId) {
     currentTeam = teams.find(t => t._id === teamId);
+    console.log('Selected team:', currentTeam);
     renderTeams();
     loadTasks();
     loadLeaderboard(teamId);
@@ -596,6 +681,11 @@ async function loadLeaderboard(teamId) {
 // Render leaderboard
 function renderLeaderboard(leaderboard) {
     const leaderboardEl = document.getElementById('leaderboard');
+    
+    if (!leaderboard || leaderboard.length === 0) {
+        leaderboardEl.innerHTML = '<div class="no-data">No team members yet</div>';
+        return;
+    }
     
     leaderboardEl.innerHTML = leaderboard.map((member, index) => `
         <div class="leaderboard-item">
@@ -638,6 +728,7 @@ async function createTeam() {
         
         if (response.ok) {
             const newTeam = await response.json();
+            console.log('Team created:', newTeam);
             teams.push(newTeam);
             renderTeams();
             hideCreateTeamModal();
@@ -648,6 +739,10 @@ async function createTeam() {
             // Switch to team mode
             switchMode('team');
             selectTeam(newTeam._id);
+        } else {
+            const error = await response.json();
+            console.error('Failed to create team:', error);
+            showNotification(error.error || 'Failed to create team', 'error');
         }
     } catch (error) {
         console.error('Failed to create team:', error);
@@ -655,15 +750,14 @@ async function createTeam() {
     }
 }
 
-// Update user stats - FIXED VERSION
+// Update user stats
 async function updateUserStats() {
     if (!currentUser) {
         console.log('No user logged in');
         return;
     }
     
-    // Use the correct ID field from your server response
-    const userId = currentUser.id || currentUser._id;
+    const userId = getCurrentUserId();
     
     if (!userId) {
         console.error('No user ID found:', currentUser);
@@ -700,6 +794,8 @@ function notifyTeamMembers(task) {
 
 // Show notification
 function showNotification(message, type = 'success') {
+    if (!notificationMessage || !notificationToast) return;
+    
     notificationMessage.textContent = message;
     notificationToast.classList.remove('hidden');
     
@@ -728,3 +824,21 @@ function updateUI() {
     renderTasks();
     renderTeams();
 }
+
+// Add CSS for no-data state
+const style = document.createElement('style');
+style.textContent = `
+    .no-tasks, .no-data {
+        text-align: center;
+        padding: 20px;
+        color: #666;
+        font-style: italic;
+    }
+    
+    .no-teams {
+        text-align: center;
+        padding: 10px;
+        color: #666;
+    }
+`;
+document.head.appendChild(style);
