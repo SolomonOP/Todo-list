@@ -1,7 +1,6 @@
 // API Configuration
-// At the top of main.js
-
-const API_URL = 'https://todo-list-ta4r.onrender.com/api'; // Replace with your Render URL
+//const API_URL = 'http://localhost:5000/api'; // Use this for local testing
+const API_URL = 'https://todo-list-ta4r.onrender.com/api'; // Use this for production
 
 // State Management
 let currentUser = null;
@@ -29,7 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
 });
 
-// Update this function
+// Check if user is logged in
 async function checkAuthStatus() {
     const token = localStorage.getItem('token');
     if (token) {
@@ -45,6 +44,7 @@ async function checkAuthStatus() {
                 currentUser = data.user;
                 console.log('User logged in:', currentUser); // Debug log
                 showApp();
+                await loadUserData();
             } else {
                 showAuthModal();
             }
@@ -56,7 +56,6 @@ async function checkAuthStatus() {
         showAuthModal();
     }
 }
-
 
 // Event Listeners
 function setupEventListeners() {
@@ -75,15 +74,17 @@ function setupEventListeners() {
                 body: JSON.stringify({ email, password })
             });
             
+            const data = await response.json();
+            
             if (response.ok) {
-                const data = await response.json();
                 localStorage.setItem('token', data.token);
                 currentUser = data.user;
+                console.log('Login successful:', currentUser);
                 showApp();
-                loadUserData();
+                await loadUserData();
                 showNotification('Welcome back, ' + currentUser.name + '! 🎉');
             } else {
-                showNotification('Login failed. Please try again.', 'error');
+                showNotification(data.error || 'Login failed. Please try again.', 'error');
             }
         } catch (error) {
             console.error('Login error:', error);
@@ -107,15 +108,17 @@ function setupEventListeners() {
                 body: JSON.stringify({ name, email, password })
             });
             
+            const data = await response.json();
+            
             if (response.ok) {
-                const data = await response.json();
                 localStorage.setItem('token', data.token);
                 currentUser = data.user;
+                console.log('Signup successful:', currentUser);
                 showApp();
-                loadUserData();
+                await loadUserData();
                 showNotification('Welcome to TaskMaster Pro, ' + currentUser.name + '! 🎮');
             } else {
-                showNotification('Registration failed. Please try again.', 'error');
+                showNotification(data.error || 'Registration failed. Please try again.', 'error');
             }
         } catch (error) {
             console.error('Signup error:', error);
@@ -150,9 +153,6 @@ function showApp() {
         document.getElementById('usernameDisplay').textContent = currentUser.name || 'Player';
         document.getElementById('userPoints').textContent = currentUser.points || 0;
         document.getElementById('userStreak').textContent = currentUser.streak || 0;
-        
-        // Load user data after showing app
-        loadUserData();
     }
 }
 
@@ -164,8 +164,11 @@ function showAuthModal() {
 
 // Load user data
 async function loadUserData() {
-    await loadTasks();
-    await loadTeams();
+    await Promise.all([
+        loadTasks(),
+        loadTeams(),
+        updateUserStats()
+    ]);
     updateUI();
 }
 
@@ -370,7 +373,6 @@ function filterTasks() {
 // Render tasks based on current mode and filters
 function renderTasks() {
     const filter = document.querySelector('input[name="taskFilter"]:checked').value;
-    const currentTime = new Date();
     
     let filteredTasks = tasks.filter(task => {
         if (task.mode !== currentMode) return false;
@@ -600,15 +602,23 @@ async function createTeam() {
     }
 }
 
-// Update user stats
+// Update user stats - FIXED VERSION
 async function updateUserStats() {
-    if (!currentUser || !currentUser.id) {
-        console.log('No user ID available');
+    if (!currentUser) {
+        console.log('No user logged in');
+        return;
+    }
+    
+    // Use the correct ID field from your server response
+    const userId = currentUser.id || currentUser._id;
+    
+    if (!userId) {
+        console.error('No user ID found:', currentUser);
         return;
     }
     
     try {
-        const response = await fetch(`${API_URL}/users/${currentUser.id}/stats`, {
+        const response = await fetch(`${API_URL}/users/${userId}/stats`, {
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
@@ -618,6 +628,12 @@ async function updateUserStats() {
             const stats = await response.json();
             document.getElementById('userPoints').textContent = stats.points || 0;
             document.getElementById('userStreak').textContent = stats.streak || 0;
+            
+            // Update current user object
+            currentUser.points = stats.points;
+            currentUser.streak = stats.streak;
+        } else {
+            console.error('Failed to fetch stats:', response.status);
         }
     } catch (error) {
         console.error('Failed to update stats:', error);
@@ -626,8 +642,6 @@ async function updateUserStats() {
 
 // Notify team members
 function notifyTeamMembers(task) {
-    // This would typically use WebSocket for real-time notifications
-    // For now, we'll just show a notification
     showNotification(`${currentUser.name} completed a team quest! 🎉`);
 }
 
