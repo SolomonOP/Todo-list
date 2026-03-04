@@ -175,6 +175,7 @@ async function loadUserData() {
 // Load tasks from backend
 async function loadTasks() {
     try {
+        console.log('Fetching tasks...');
         const response = await fetch(`${API_URL}/tasks`, {
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -183,7 +184,10 @@ async function loadTasks() {
         
         if (response.ok) {
             tasks = await response.json();
+            console.log('Tasks loaded:', tasks); // Debug: see what tasks are returned
             renderTasks();
+        } else {
+            console.error('Failed to load tasks:', response.status);
         }
     } catch (error) {
         console.error('Failed to load tasks:', error);
@@ -372,77 +376,114 @@ function filterTasks() {
 
 // Render tasks based on current mode and filters
 function renderTasks() {
-    const filter = document.querySelector('input[name="taskFilter"]:checked').value;
+    console.log('Rendering tasks. Current mode:', currentMode);
+    console.log('All tasks:', tasks);
     
+    const filter = document.querySelector('input[name="taskFilter"]:checked')?.value || 'all';
+    
+    // Filter tasks based on current mode
     let filteredTasks = tasks.filter(task => {
-        if (task.mode !== currentMode) return false;
-        if (currentMode === 'team' && task.team !== currentTeam?._id) return false;
-        
-        // Apply filters
-        switch(filter) {
-            case 'daily':
-                return task.type === 'daily';
-            case 'weekly':
-                return task.type === 'weekly';
-            case 'completed':
-                return task.completed;
-            default:
-                return true;
+        // Check if task belongs to current mode
+        if (currentMode === 'personal') {
+            // Personal mode: show tasks where user is creator or assignee AND no team
+            return !task.team && (task.createdBy === currentUser?.id || task.assignedTo === currentUser?.id);
+        } else {
+            // Team mode: show tasks for selected team
+            return currentTeam && task.team === currentTeam._id;
         }
     });
+    
+    console.log('Filtered tasks:', filteredTasks);
+    
+    // Apply additional filters (daily, weekly, completed)
+    if (filter !== 'all') {
+        filteredTasks = filteredTasks.filter(task => {
+            if (filter === 'completed') return task.completed;
+            return task.type === filter;
+        });
+    }
     
     // Separate active and completed tasks
     const activeTasks = filteredTasks.filter(t => !t.completed);
     const completedTasks = filteredTasks.filter(t => t.completed);
     
+    console.log('Active tasks:', activeTasks);
+    console.log('Completed tasks:', completedTasks);
+    
     // Sort active tasks by due date
     activeTasks.sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
     
+    // Get the container elements
+    const tasksList = document.getElementById('tasksList');
+    const completedTasksList = document.getElementById('completedTasksList');
+    
+    if (!tasksList || !completedTasksList) {
+        console.error('Task list elements not found!');
+        return;
+    }
+    
     // Render active tasks
-    tasksList.innerHTML = activeTasks.map(task => createTaskHTML(task, false)).join('');
+    if (activeTasks.length === 0) {
+        tasksList.innerHTML = '<div class="no-tasks">No active quests. Start one!</div>';
+    } else {
+        tasksList.innerHTML = activeTasks.map(task => createTaskHTML(task, false)).join('');
+    }
     
     // Render completed tasks
-    completedTasksList.innerHTML = completedTasks.map(task => createTaskHTML(task, true)).join('');
+    if (completedTasks.length === 0) {
+        completedTasksList.innerHTML = '<div class="no-tasks">No completed quests yet.</div>';
+    } else {
+        completedTasksList.innerHTML = completedTasks.map(task => createTaskHTML(task, true)).join('');
+    }
     
     // Update total tasks count
-    document.getElementById('totalTasks').textContent = activeTasks.length;
+    const totalTasksEl = document.getElementById('totalTasks');
+    if (totalTasksEl) {
+        totalTasksEl.textContent = activeTasks.length;
+    }
 }
 
-// Create task HTML
+// Update createTaskHTML to handle missing data
 function createTaskHTML(task, isCompleted) {
-    const dueDate = new Date(task.dueDate);
+    if (!task) return '';
+    
+    const dueDate = task.dueDate ? new Date(task.dueDate) : new Date();
     const today = new Date();
     const isOverdue = dueDate < today && !task.completed;
     const points = getPointsForTask(task);
+    
+    // Safely access nested properties
+    const assignedToName = task.assignedTo?.name || 'Unassigned';
+    const teamMembers = task.team?.members || [];
     
     return `
         <div class="task-item" data-task-id="${task._id}">
             <div class="task-checkbox ${isCompleted ? 'completed' : ''}" 
                  onclick="toggleTask('${task._id}', ${isCompleted})"></div>
             <div class="task-content">
-                <div class="task-title ${isCompleted ? 'completed' : ''}">${task.title}</div>
+                <div class="task-title ${isCompleted ? 'completed' : ''}">${task.title || 'Untitled'}</div>
                 <div class="task-meta">
-                    <span class="task-type">${task.type}</span>
-                    <span class="task-difficulty ${task.difficulty}">${getDifficultyStars(task.difficulty)}</span>
+                    <span class="task-type">${task.type || 'simple'}</span>
+                    <span class="task-difficulty ${task.difficulty || 'medium'}">${getDifficultyStars(task.difficulty)}</span>
                     <span class="task-due-date ${isOverdue ? 'overdue' : ''}">
                         <i class="far fa-calendar"></i> ${formatDate(task.dueDate)}
                         ${isOverdue ? ' (Overdue!)' : ''}
                     </span>
                     ${task.assignedTo ? `
                         <span class="assigned-to">
-                            <i class="far fa-user"></i> ${task.assignedTo.name}
+                            <i class="far fa-user"></i> ${assignedToName}
                         </span>
                     ` : ''}
                 </div>
-                ${task.team && task.assignedTo ? `
+                ${task.team && teamMembers.length > 0 ? `
                     <div class="team-members">
-                        ${task.team.members.slice(0, 3).map(member => `
-                            <div class="member-tag" title="${member.name}">
-                                ${member.name.charAt(0)}
+                        ${teamMembers.slice(0, 3).map(member => `
+                            <div class="member-tag" title="${member.name || 'Member'}">
+                                ${(member.name || '?').charAt(0)}
                             </div>
                         `).join('')}
-                        ${task.team.members.length > 3 ? `
-                            <div class="member-tag">+${task.team.members.length - 3}</div>
+                        ${teamMembers.length > 3 ? `
+                            <div class="member-tag">+${teamMembers.length - 3}</div>
                         ` : ''}
                     </div>
                 ` : ''}
@@ -463,6 +504,18 @@ function createTaskHTML(task, isCompleted) {
         </div>
     `;
 }
+
+// Add this CSS to your style.css (at the end)
+const style = document.createElement('style');
+style.textContent = `
+    .no-tasks {
+        text-align: center;
+        padding: 20px;
+        color: #666;
+        font-style: italic;
+    }
+`;
+document.head.appendChild(style);
 
 // Get points for task based on difficulty and type
 function getPointsForTask(task) {
